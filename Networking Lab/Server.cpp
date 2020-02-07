@@ -119,6 +119,8 @@ int main()
 			auto recieveStr = std::string(recieveBuffer);
 			recieveStr = recieveStr.substr(0, iResult - 1);
 
+			printf("\tCMD: %s\n", recieveStr.c_str());
+
 			auto sendStr = std::string();
 			do {
 				if (recieveStr == "quit")
