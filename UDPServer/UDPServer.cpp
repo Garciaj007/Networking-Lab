@@ -5,6 +5,8 @@
 #include <string>
 #pragma comment (lib, "ws2_32.lib")
 
+//Acknowledge receipt of input
+
 int main()
 {
 	WSAData data;
@@ -41,8 +43,8 @@ int main()
 		ZeroMemory(&client, clientLength);
 		ZeroMemory(buffer, 1024);
 
-		int bytesIn = recvfrom(sock, buffer, 1024,0, reinterpret_cast<sockaddr*>(&client), &clientLength);
-		if (bytesIn == SOCKET_ERROR)
+		int recieveResult = recvfrom(sock, buffer, 1024,0, reinterpret_cast<sockaddr*>(&client), &clientLength);
+		if (recieveResult == SOCKET_ERROR)
 		{
 			printf("Error recieving from the client %i\n", WSAGetLastError());
 			continue;
@@ -52,9 +54,14 @@ int main()
 		ZeroMemory(clientIP, 256);
 
 		inet_ntop(AF_INET, &client.sin_addr, clientIP, 256);
-		printf("Message Recieved From [%s] %s", clientIP, buffer);
+		printf("Message Recieved From [%s] %s\n", clientIP, buffer);
 
-		int id = 0, position = 0; 
+		auto content = std::string(buffer);
+		
+		if (content == "exit") break;
+
+		std::string id;
+		int position = 0; 
 		for (int i = 0; i < 10; i++)
 		{
 			position++;
@@ -62,15 +69,27 @@ int main()
 			id += buffer[i];
 		}
 
-		if (packets.find(id) != packets.end()) continue;
+		if (packets.find(std::atoi(id.c_str())) != packets.end()) continue;
 
-		auto content = std::string(buffer);
-		content = content.substr(position, bytesIn - 1);
+		content = content.substr(position, recieveResult - 1);
+		
+		printf("Recieved ID: %i\n\tMessage: %s\n", std::atoi(id.c_str()), content.c_str());
+
 		if (content == "exit") break;
-		packets.emplace(std::make_pair(id, content));
+
+		packets.emplace(std::make_pair(std::stoi(id), content));
+
+		//Acknowledge receipt of input [Return the id of packets recieved]
+		auto result = sendto(sock, id.c_str(), 256, 0, reinterpret_cast<sockaddr*>(&client), sizeof(clientLength));
+		if (result == SOCKET_ERROR)
+		{
+			printf("Acknowledge did not work: %i\n", WSAGetLastError());
+			//return -2;
+		}
 	}
 
-	printf("Printing all packets recieved:\n");
+	//Display all input received from the client in the correct sequence.
+	printf("Ending Session...\nPrinting all packets recieved:\n");
 	for (auto packet : packets)
 	{
 		printf("\t%i : %s\n", packet.first, packet.second.c_str());
