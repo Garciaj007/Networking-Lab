@@ -19,16 +19,16 @@ void Shutdown(SOCKET sock)
 int main()
 {
 	WSAData data;
-	WORD version = MAKEWORD(2, 2);
+	const WORD version = MAKEWORD(2, 2);
 
-	auto wsaResult = WSAStartup(version, &data);
+	const auto wsaResult = WSAStartup(version, &data);
 	if (wsaResult != 0)
 	{
 		printf("Couldn't start WinSock: %i", wsaResult);
 		return -1;
 	}
 
-	SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
+	SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
 	sockaddr_in server;
 	server.sin_family = AF_INET;
@@ -36,7 +36,8 @@ int main()
 	inet_pton(AF_INET, "127.0.0.1", &server.sin_addr);
 
 	bool hold = false;
-	char acknowledgeBuffer[256];
+	int lastIndex = 0;
+	char acknowledgeBuffer[32];
 	std::map<int, std::string> packetsToSend;
 
 	while (true)
@@ -47,11 +48,11 @@ int main()
 			//std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
 			//Freeze input until acknowledgement from the server is received.
-			int bytesIn = recvfrom(sock, acknowledgeBuffer, 256, 0, nullptr, nullptr);
+			const int bytesIn = recvfrom(sock, acknowledgeBuffer, 32, 0, nullptr, nullptr);
 			if (bytesIn == SOCKET_ERROR)
 			{
 				printf("Acknowledgement did not work: %i\n", WSAGetLastError());
-				//return -3; //Might Change
+				return -3; //Might Change
 			}
 
 			std::string acknowledgedPacketIndex = acknowledgeBuffer;
@@ -76,12 +77,14 @@ int main()
 					auto packet = std::to_string(i);
 					packet += '^';
 					packet += packetsToSend[i];
-					auto result = sendto(sock, packet.c_str(), packet.size(), 0, reinterpret_cast<sockaddr*>(&server), sizeof(server));
+					
+					const auto result = sendto(sock, packet.c_str(), packet.size(), 0, reinterpret_cast<sockaddr*>(&server), sizeof(server));
 					if (result == SOCKET_ERROR)
 					{
 						printf("Sending did not work: %i\n", WSAGetLastError());
 						return -2;
 					}
+					lastIndex++;
 				}
 				hold = true;
 				break;
@@ -90,22 +93,20 @@ int main()
 			//Exit when EXIT command is entered
 			if (contentBuffer == "exit")
 			{
-				auto result = sendto(sock, "exit", strlen("exit"), 0, reinterpret_cast<sockaddr*>(&server), sizeof(server));
+				const auto result = sendto(sock, "exit", strlen("exit"), 0, reinterpret_cast<sockaddr*>(&server), sizeof(server));
 				if (result == SOCKET_ERROR)
 				{
 					printf("Sending did not work: %i\n", WSAGetLastError());
 					return -2;
 				}
-				break;
+				Shutdown(sock); 
 			}
 
 			//Add a sequence to each input(a number or timestamp which indicates the message's order)
 			if (packetsToSend.empty())
-				packetsToSend.emplace(std::make_pair(0, contentBuffer));
+				packetsToSend.emplace(std::make_pair(lastIndex, contentBuffer));
 			else
 				packetsToSend.emplace(std::make_pair(packetsToSend.rbegin()->first + 1, contentBuffer));
 		}
 	}
-
-	Shutdown(sock); 
 }

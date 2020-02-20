@@ -10,16 +10,16 @@
 int main()
 {
 	WSAData data;
-	WORD version = MAKEWORD(2, 2);
+	const WORD version = MAKEWORD(2, 2);
 
-	auto wsaResult = WSAStartup(version, &data);
+	const auto wsaResult = WSAStartup(version, &data);
 	if (wsaResult != 0)
 	{
 		printf("Couldn't start WinSock: %i", wsaResult);
 		return -1;
 	}
 
-	SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
+	const SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
 
 	sockaddr_in serverHint;
 	serverHint.sin_addr.S_un.S_addr = ADDR_ANY;
@@ -43,10 +43,10 @@ int main()
 		ZeroMemory(&client, clientLength);
 		ZeroMemory(buffer, 1024);
 
-		int recieveResult = recvfrom(sock, buffer, 1024,0, reinterpret_cast<sockaddr*>(&client), &clientLength);
-		if (recieveResult == SOCKET_ERROR)
+		const int receiveResult = recvfrom(sock, buffer, 1024,0, reinterpret_cast<sockaddr*>(&client), &clientLength);
+		if (receiveResult == SOCKET_ERROR)
 		{
-			printf("Error recieving from the client %i\n", WSAGetLastError());
+			printf("Error receiving from the client %i\n", WSAGetLastError());
 			continue;
 		}
 
@@ -54,7 +54,7 @@ int main()
 		ZeroMemory(clientIP, 256);
 
 		inet_ntop(AF_INET, &client.sin_addr, clientIP, 256);
-		printf("Message Recieved From [%s] %s\n", clientIP, buffer);
+		printf("Message Received From [%s] %s\n", clientIP, buffer);
 
 		auto content = std::string(buffer);
 		
@@ -71,16 +71,16 @@ int main()
 
 		if (packets.find(std::atoi(id.c_str())) != packets.end()) continue;
 
-		content = content.substr(position, recieveResult - 1);
+		content = content.substr(position, receiveResult - 1);
 		
-		printf("Recieved ID: %i\n\tMessage: %s\n", std::atoi(id.c_str()), content.c_str());
+		printf("Received ID: %i\n\tMessage: %s\n", std::atoi(id.c_str()), content.c_str());
 
 		if (content == "exit") break;
 
 		packets.emplace(std::make_pair(std::stoi(id), content));
 
-		//Acknowledge receipt of input [Return the id of packets recieved]
-		auto result = sendto(sock, id.c_str(), 256, 0, reinterpret_cast<sockaddr*>(&client), sizeof(clientLength));
+		//Acknowledge receipt of input [Return the id of packets received]
+		const auto result = sendto(sock, id.c_str(), 32, 0, reinterpret_cast<sockaddr*>(&client), clientLength);
 		if (result == SOCKET_ERROR)
 		{
 			printf("Acknowledge did not work: %i\n", WSAGetLastError());
@@ -89,7 +89,7 @@ int main()
 	}
 
 	//Display all input received from the client in the correct sequence.
-	printf("Ending Session...\nPrinting all packets recieved:\n");
+	printf("Ending Session...\nPrinting all packets received:\n");
 	for (auto packet : packets)
 	{
 		printf("\t%i : %s\n", packet.first, packet.second.c_str());
@@ -97,4 +97,6 @@ int main()
 
 	closesocket(sock);
 	WSACleanup();
+
+	auto _ = getchar();
 }
